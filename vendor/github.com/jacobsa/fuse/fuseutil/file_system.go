@@ -39,6 +39,7 @@ type FileSystem interface {
 	GetInodeAttributes(context.Context, *fuseops.GetInodeAttributesOp) error
 	SetInodeAttributes(context.Context, *fuseops.SetInodeAttributesOp) error
 	ForgetInode(context.Context, *fuseops.ForgetInodeOp) error
+	BatchForget(context.Context, *fuseops.BatchForgetOp) error
 	MkDir(context.Context, *fuseops.MkDirOp) error
 	MkNode(context.Context, *fuseops.MkNodeOp) error
 	CreateFile(context.Context, *fuseops.CreateFileOp) error
@@ -150,6 +151,22 @@ func (s *fileSystemServer) handleOp(
 
 	case *fuseops.ForgetInodeOp:
 		err = s.fs.ForgetInode(ctx, typed)
+
+	case *fuseops.BatchForgetOp:
+		err = s.fs.BatchForget(ctx, typed)
+		if err == fuse.ENOSYS {
+			// Handle as a series of single-inode forget operations
+			for _, entry := range typed.Entries {
+				err = s.fs.ForgetInode(ctx, &fuseops.ForgetInodeOp{
+					Inode:     entry.Inode,
+					N:         entry.N,
+					OpContext: typed.OpContext,
+				})
+				if err != nil {
+					break
+				}
+			}
+		}
 
 	case *fuseops.MkDirOp:
 		err = s.fs.MkDir(ctx, typed)
