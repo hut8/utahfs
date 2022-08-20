@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/jacobsa/fuse"
@@ -653,6 +654,18 @@ func (fs *filesystem) rmNode(ctx context.Context, parent *node, name string, arc
 	delete(parent.Children, name)
 
 	return nil
+}
+
+func (fs *filesystem) GetXattr(
+	ctx context.Context,
+	op *fuseops.GetXattrOp) (err error) {
+	return syscall.ENODATA
+}
+
+func (fs *filesystem) ListXattr(
+	ctx context.Context,
+	op *fuseops.ListXattrOp) error {
+	return syscall.ENODATA
 }
 
 func (fs *filesystem) synchronize(ctx context.Context) func() {
