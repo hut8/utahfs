@@ -207,7 +207,7 @@ func (c *Client) localStorage() (persistent.ReliableStorage, error) {
 
 	// Setup caching if desired.
 	if c.MemCacheSize == 0 {
-		c.MemCacheSize = 32 * 1024
+		c.MemCacheSize = 8 * 1024
 	}
 	if c.MemCacheSize != -1 {
 		relStore = persistent.NewCache(relStore, c.MemCacheSize)
