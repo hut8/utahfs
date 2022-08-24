@@ -148,7 +148,7 @@ func (lw *localWAL) drainOnce() error {
 
 		rows, err := lw.local.Query("SELECT id, key, val, dt FROM wal LIMIT 100")
 		if err != nil {
-			return err
+			return fmt.Errorf("wal: could not query data: %v", err)
 		}
 		for rows.Next() {
 			var (
@@ -159,7 +159,7 @@ func (lw *localWAL) drainOnce() error {
 			)
 			if err := rows.Scan(&id, &key, &val, &dt); err != nil {
 				rows.Close()
-				return err
+				return fmt.Errorf("wal: could not scan wal rows: %v", err)
 			}
 			ids = append(ids, id)
 			keys = append(keys, key)
@@ -168,7 +168,7 @@ func (lw *localWAL) drainOnce() error {
 		}
 		if err := rows.Err(); err != nil {
 			rows.Close()
-			return err
+			return fmt.Errorf("wal: rows query encountered error: %v", err)
 		}
 		rows.Close()
 		if len(ids) == 0 {
@@ -186,7 +186,7 @@ func (lw *localWAL) drainOnce() error {
 			}
 		}
 		if err != nil {
-			return err
+			return fmt.Errorf("wal: write error writing to underlying storage: %v", err)
 		}
 
 		idStrs := make([]string, 0, len(ids))
@@ -195,7 +195,7 @@ func (lw *localWAL) drainOnce() error {
 		}
 		_, err = lw.local.Exec("DELETE FROM wal WHERE id in (" + strings.Join(idStrs, ",") + ")")
 		if err != nil {
-			return err
+			return fmt.Errorf("wal: error deleting entries after write: %v", err)
 		}
 	}
 }
@@ -212,7 +212,7 @@ func (lw *localWAL) count() (int, error) {
 	var count int
 	err := lw.local.QueryRow("SELECT COUNT(*) FROM wal").Scan(&count)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("wal: could not count rows: %v", err)
 	}
 
 	lw.mu.Lock()
@@ -256,7 +256,7 @@ func (lw *localWAL) Get(ctx context.Context, key uint64) ([]byte, error) {
 	} else if len(val) == 0 {
 		return nil, ErrObjectNotFound
 	} else if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("wal: error querying for value with key %v: %v", key, err)
 	}
 	return val, nil
 }
@@ -268,7 +268,7 @@ func (lw *localWAL) GetMany(ctx context.Context, keys []uint64) (map[uint64][]by
 		if err == ErrObjectNotFound {
 			continue
 		} else if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("wal: could not getmany with key %v: %v", key, err)
 		}
 		out[key] = val
 	}
@@ -282,26 +282,26 @@ func (lw *localWAL) Commit(ctx context.Context, writes map[uint64]WriteData) err
 
 	tx, err := lw.local.BeginTx(ctx, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf("wal: could not begin tx: %v", err)
 	}
 	delStmt, err := tx.Prepare("DELETE FROM wal WHERE key = ?")
 	if err != nil {
 		tx.Rollback()
-		return err
+		return fmt.Errorf("wal: could not prepare delete statement: %v", err)
 	}
 	insertStmt, err := tx.Prepare("INSERT INTO wal (key, val, dt) VALUES (?, ?, ?)")
 	if err != nil {
 		tx.Rollback()
-		return err
+		return fmt.Errorf("wal: could not prepare insert statement: %v", err)
 	}
 
 	for key, wr := range writes {
 		if _, err := delStmt.Exec(key); err != nil {
 			tx.Rollback()
-			return err
+			return fmt.Errorf("wal: could not execute delete statement for key %v: %v", key, err)
 		} else if _, err := insertStmt.Exec(key, wr.Data, wr.Type); err != nil {
 			tx.Rollback()
-			return err
+			return fmt.Errorf("wal: could not execute insert statement for key %v: %v", key, err)
 		}
 	}
 
