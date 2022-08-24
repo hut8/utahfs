@@ -23,6 +23,12 @@ var LocalWALSize = prometheus.NewGaugeVec(
 	},
 	[]string{"path"},
 )
+var LocalWALDrainDuration = prometheus.NewSummary(
+	prometheus.SummaryOpts{
+		Name: "local_wal_drain_duration",
+		Help: "Amount of time that drainOnce() takes in msec.",
+	},
+)
 
 type localWAL struct {
 	mu sync.Mutex
@@ -105,6 +111,12 @@ func (lw *localWAL) drainOnce() error {
 	reqs := make(chan walReq, 100)
 	errs := make(chan error, 100)
 	defer close(reqs)
+	// benchmarking for draining
+	startTime := time.Now()
+	defer func() {
+		elapsed := time.Now().Sub(startTime)
+		LocalWALDrainDuration.Observe(float64(elapsed.Milliseconds()))
+	}()
 
 	for i := 0; i < lw.parallelism; i++ {
 		go func() {
