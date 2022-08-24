@@ -16,6 +16,8 @@ func init() {
 	prometheus.MustRegister(persistent.AppStorageCommits)
 	prometheus.MustRegister(persistent.LocalWALSize)
 	prometheus.MustRegister(persistent.LocalWALDrainDuration)
+	prometheus.MustRegister(persistent.LocalWALDrainSetDuration)
+	prometheus.MustRegister(persistent.LocalWALQueryDuration)
 	prometheus.MustRegister(persistent.DiskCacheSize)
 	prometheus.MustRegister(persistent.B2Ops)
 	prometheus.MustRegister(persistent.GCSOps)
