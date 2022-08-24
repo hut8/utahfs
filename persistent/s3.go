@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"io/ioutil"
+	"log"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -49,12 +50,14 @@ func (s *s3Client) Get(ctx context.Context, key string) ([]byte, error) {
 		S3Ops.WithLabelValues("get", "true").Inc()
 		return nil, ErrObjectNotFound
 	} else if err != nil {
+		log.Printf("s3: get: error: %v", err)
 		S3Ops.WithLabelValues("get", "false").Inc()
 		return nil, err
 	}
 	data, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		S3Ops.WithLabelValues("get", "false").Inc()
+		log.Printf("s3: get: read error: %v", err)
 		return nil, err
 	}
 	S3Ops.WithLabelValues("get", "true").Inc()
@@ -69,6 +72,7 @@ func (s *s3Client) Set(ctx context.Context, key string, data []byte, _ DataType)
 	})
 	if err != nil {
 		S3Ops.WithLabelValues("set", "false").Inc()
+		log.Printf("s3: set: error: %v", err)
 		return err
 	}
 
@@ -83,6 +87,7 @@ func (s *s3Client) Delete(ctx context.Context, key string) error {
 	})
 	if err != nil {
 		S3Ops.WithLabelValues("delete", "false").Inc()
+		log.Printf("s3: delete: error: %v", err)
 		return err
 	}
 
