@@ -26,7 +26,19 @@ var LocalWALSize = prometheus.NewGaugeVec(
 var LocalWALDrainDuration = prometheus.NewSummary(
 	prometheus.SummaryOpts{
 		Name: "local_wal_drain_duration",
-		Help: "Amount of time that drainOnce() takes in msec.",
+		Help: "Duration that drainOnce() takes in msec.",
+	},
+)
+var LocalWALDrainSetDuration = prometheus.NewSummary(
+	prometheus.SummaryOpts{
+		Name: "local_wal_drain_set_duration",
+		Help: "Duration that writing to underlying store takes in msec.",
+	},
+)
+var LocalWALQueryDuration = prometheus.NewSummary(
+	prometheus.SummaryOpts{
+		Name: "local_wal_query_duration",
+		Help: "Duration that loading chunk of wal takes in msec.",
 	},
 )
 
@@ -128,7 +140,10 @@ func (lw *localWAL) drainOnce() error {
 
 				var err error
 				if len(req.val) > 0 {
+					drainSetStart := time.Now()
 					err = lw.base.Set(context.Background(), hex(req.key), req.val, req.dt)
+					drainSetElapsed := time.Now().Sub(drainSetStart)
+					LocalWALDrainSetDuration.Observe(float64(drainSetElapsed.Milliseconds()))
 				} else {
 					err = lw.base.Delete(context.Background(), hex(req.key))
 				}
@@ -146,6 +161,7 @@ func (lw *localWAL) drainOnce() error {
 			dts  []DataType
 		)
 
+		queryStart := time.Now()
 		rows, err := lw.local.Query("SELECT id, key, val, dt FROM wal LIMIT 100")
 		if err != nil {
 			return fmt.Errorf("wal: could not query data: %v", err)
@@ -174,6 +190,8 @@ func (lw *localWAL) drainOnce() error {
 		if len(ids) == 0 {
 			return nil
 		}
+		queryElapsed := time.Now().Sub(queryStart)
+		LocalWALQueryDuration.Observe(float64(queryElapsed.Milliseconds()))
 
 		// Write entries read from the WAL to the underlying storage. This is
 		// done outside of the database query to prevent blocking other threads.
